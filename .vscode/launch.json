@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/aaravdaga/Desktop/emulator/chip8/src",
+      "program": "/Users/aaravdaga/Desktop/emulator/chip8/src/build/Debug/outDebug"
+    }
+  ]
+}
