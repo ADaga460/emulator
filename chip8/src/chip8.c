@@ -1,7 +1,3 @@
-#include "chip8.h"
-#include <stdio.h>
-#include <string.h>
-
 /*
 Concepts:
     Implementation of chip8.h functions for CHIP-8 emulator.
@@ -12,144 +8,287 @@ Concepts:
     How is the display cleared? By zeroing out the display buffer and setting the draw flag.
     What happens during an emulation cycle? Fetching, decoding, and executing an opcode.
 */
+#include "chip8.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
+/* Minimal fontset, 5 bytes per character 0-F, commonly loaded at 0x50 */
+static const uint8_t fontset[80] = {
+    0xF0,0x90,0x90,0x90,0xF0, /* 0 */
+    0x20,0x60,0x20,0x20,0x70, /* 1 */
+    0xF0,0x10,0xF0,0x80,0xF0, /* 2 */
+    0xF0,0x10,0xF0,0x10,0xF0, /* 3 */
+    0x90,0x90,0xF0,0x10,0x10, /* 4 */
+    0xF0,0x80,0xF0,0x10,0xF0, /* 5 */
+    0xF0,0x80,0xF0,0x90,0xF0, /* 6 */
+    0xF0,0x10,0x20,0x40,0x40, /* 7 */
+    0xF0,0x90,0xF0,0x90,0xF0, /* 8 */
+    0xF0,0x90,0xF0,0x10,0xF0, /* 9 */
+    0xF0,0x90,0xF0,0x90,0x90, /* A */
+    0xE0,0x90,0xE0,0x90,0xE0, /* B */
+    0xF0,0x80,0x80,0x80,0xF0, /* C */
+    0xE0,0x90,0x90,0x90,0xE0, /* D */
+    0xF0,0x80,0xF0,0x80,0xF0, /* E */
+    0xF0,0x80,0xF0,0x80,0x80  /* F */
+};
 
-/* Initialize core subsystems */
 void chip8_init(Chip8 *c) {
     memory_init(&c->memory);
     cpu_init(&c->cpu);
-    memset(c->display, 0, sizeof(c->display));
+    memset(c->gfx, 0, sizeof(c->gfx));
     memset(c->keys, 0, sizeof(c->keys));
     c->draw_flag = 0;
 
-    /* Load standard fontset into interpreter area (0x000 - 0x1FF).
-       For now we use a minimal font (can be expanded). */
-    static const uint8_t fontset[] = {
-        0xF0,0x90,0x90,0x90,0xF0, /* 0 */
-        0x20,0x60,0x20,0x20,0x70, /* 1 */
-        0xF0,0x10,0xF0,0x80,0xF0, /* 2 */
-        0xF0,0x10,0xF0,0x10,0xF0, /* 3 */
-        0x90,0x90,0xF0,0x10,0x10, /* 4 */
-        0xF0,0x80,0xF0,0x10,0xF0, /* 5 */
-        0xF0,0x80,0xF0,0x90,0xF0, /* 6 */
-        0xF0,0x10,0x20,0x40,0x40, /* 7 */
-        0xF0,0x90,0xF0,0x90,0xF0, /* 8 */
-        0xF0,0x90,0xF0,0x10,0xF0, /* 9 */
-        0xF0,0x90,0xF0,0x90,0x90, /* A */
-        0xE0,0x90,0xE0,0x90,0xE0, /* B */
-        0xF0,0x80,0x80,0x80,0xF0, /* C */
-        0xE0,0x90,0x90,0x90,0xE0, /* D */
-        0xF0,0x80,0xF0,0x80,0xF0, /* E */
-        0xF0,0x80,0xF0,0x80,0x80  /* F */
-    };
-
-    /* fontset load at 0x050 is common. adjust if you want another base. */
-    const size_t font_offset = 0x50;
-    memcpy(&c->memory.data[font_offset], fontset, sizeof(fontset));
+    /* Load fontset at 0x50 */
+    const size_t fontaddr = 0x50;
+    if (fontaddr + sizeof(fontset) < MEMORY_SIZE) {
+        memcpy(&c->memory.data[fontaddr], fontset, sizeof(fontset));
+    }
 }
 
-/* Convenience wrapper for ROM loading */
 void chip8_load_rom(Chip8 *c, const char *filename) {
     memory_load_rom(&c->memory, filename);
 }
 
-/* Set or clear a key (0..15) */
 void chip8_set_key(Chip8 *c, uint8_t key, uint8_t pressed) {
     if (key < 16) c->keys[key] = pressed ? 1 : 0;
 }
 
-/* Clear the display buffer */
 void chip8_clear_display(Chip8 *c) {
-    memset(c->display, 0, sizeof(c->display));
+    memset(c->gfx, 0, sizeof(c->gfx));
     c->draw_flag = 1;
 }
 
-/*
- Emulate one fetch/decode/execute cycle.
- This function currently:
- - fetches the opcode (big-endian)
- - advances pc by 2
- - prints opcode for inspection
- - handles a couple minimal opcodes as examples
- Extend the switch to implement the rest of the CHIP-8 instruction set.
-*/
+void chip8_draw_display(const Chip8 *c) {
+    // clear screen ANSI
+    printf("\033[H\033[J");
+    for (int y = 0; y < DISPLAY_HEIGHT; ++y) {
+        for (int x = 0; x < DISPLAY_WIDTH; ++x) {
+            putchar(c->gfx[y * DISPLAY_WIDTH + x] ? '#' : ' ');
+        }
+        putchar('\n');
+    }
+}
+
+/* Emulate one CPU cycle: fetch, decode, execute */
 void chip8_emulate_cycle(Chip8 *c) {
     uint16_t opcode = cpu_fetch_opcode(&c->cpu, &c->memory);
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t y = (opcode & 0x00F0) >> 4;
+    uint8_t nn = opcode & 0x00FF;
+    uint16_t nnn = opcode & 0x0FFF;
+    uint8_t n = opcode & 0x000F;
 
-    /* Basic debug output. Remove or guard behind a debug flag later. */
+    // Debug
     printf("Opcode: 0x%04X  PC: 0x%04X\n", opcode, c->cpu.pc);
 
-    /* Decode example: use high nibble and more specific masks below */
     switch (opcode & 0xF000) {
         case 0x0000:
             switch (opcode & 0x00FF) {
-                case 0x00E0: /* CLS: clear the display */
+                case 0x00E0: // CLS
                     chip8_clear_display(c);
                     c->cpu.pc += 2;
                     break;
-                case 0x00EE: /* RET: return from subroutine */
+                case 0x00EE: // RET
                     if (c->cpu.sp == 0) {
                         fprintf(stderr, "Stack underflow on RET\n");
-                        c->cpu.pc += 2; /* attempt to continue */
+                        c->cpu.pc += 2;
                     } else {
                         c->cpu.sp--;
-                        c->cpu.pc = c->cpu.stack[c->cpu.sp];
-                        c->cpu.pc += 2;
+                        c->cpu.pc = c->cpu.stack[c->cpu.sp] + 2;
                     }
                     break;
                 default:
-                    /* 0NNN is often ignored in modern interpreters */
+                    // 0NNN ignored
                     c->cpu.pc += 2;
                     break;
             }
             break;
 
-        case 0x1000: { /* 1NNN: JP addr */
-            uint16_t addr = opcode & 0x0FFF;
-            c->cpu.pc = addr;
+        case 0x1000: // JP addr
+            c->cpu.pc = nnn;
             break;
-        }
 
-        case 0x2000: { /* 2NNN: CALL addr */
-            uint16_t addr = opcode & 0x0FFF;
-            if (c->cpu.sp >= 16) {
-                fprintf(stderr, "Stack overflow on CALL\n");
+        case 0x2000: // CALL addr
+            if (c->cpu.sp < 16) {
+                c->cpu.stack[c->cpu.sp++] = c->cpu.pc;
+                c->cpu.pc = nnn;
             } else {
-                c->cpu.stack[c->cpu.sp] = c->cpu.pc;
-                c->cpu.sp++;
-                c->cpu.pc = addr;
+                fprintf(stderr, "Stack overflow on CALL\n");
             }
             break;
-        }
 
-        case 0x6000: { /* 6XNN: LD Vx, byte */
-            uint8_t x = (opcode & 0x0F00) >> 8;
-            uint8_t byte = opcode & 0x00FF;
-            c->cpu.V[x] = byte;
+        case 0x3000: // SE Vx, byte
+            c->cpu.pc += (c->cpu.V[x] == nn) ? 4 : 2;
+            break;
+
+        case 0x4000: // SNE Vx, byte
+            c->cpu.pc += (c->cpu.V[x] != nn) ? 4 : 2;
+            break;
+
+        case 0x5000: // SE Vx, Vy (5XY0)
+            if ((opcode & 0x000F) == 0x0) {
+                c->cpu.pc += (c->cpu.V[x] == c->cpu.V[y]) ? 4 : 2;
+            } else {
+                c->cpu.pc += 2;
+            }
+            break;
+
+        case 0x6000: // LD Vx, byte
+            c->cpu.V[x] = nn;
+            c->cpu.pc += 2;
+            break;
+
+        case 0x7000: // ADD Vx, byte
+            c->cpu.V[x] = (uint8_t)(c->cpu.V[x] + nn);
+            c->cpu.pc += 2;
+            break;
+
+        case 0x8000: {
+            uint8_t sub = opcode & 0x000F;
+            switch (sub) {
+                case 0x0: // LD Vx, Vy
+                    c->cpu.V[x] = c->cpu.V[y];
+                    break;
+                case 0x4: { // ADD Vx, Vy; VF = carry
+                    uint16_t sum = c->cpu.V[x] + c->cpu.V[y];
+                    c->cpu.V[0xF] = (sum > 0xFF) ? 1 : 0;
+                    c->cpu.V[x] = (uint8_t)sum;
+                    break;
+                }
+                default:
+                    // not implemented other 8XYn
+                    break;
+            }
             c->cpu.pc += 2;
             break;
         }
 
-        case 0xA000: { /* ANNN: LD I, addr */
-            c->cpu.I = opcode & 0x0FFF;
+        case 0xA000: // LD I, addr
+            c->cpu.I = nnn;
+            c->cpu.pc += 2;
+            break;
+
+        case 0xC000: { // RND Vx, byte
+            uint8_t rnd = (uint8_t)(rand() & 0xFF);
+            c->cpu.V[x] = rnd & nn;
             c->cpu.pc += 2;
             break;
         }
 
-        case 0xD000: { /* DXYN: DRW Vx, Vy, nibble */
-            /* For now implement a simple placeholder that sets draw_flag.
-               Full sprite logic requires XOR and collision flag VF. */
+        case 0xD000: { // DRW Vx, Vy, nibble
+            uint8_t xPos = c->cpu.V[x] % DISPLAY_WIDTH;
+            uint8_t yPos = c->cpu.V[y] % DISPLAY_HEIGHT;
+            uint8_t height = n;
+            c->cpu.V[0xF] = 0;
+
+            for (uint8_t row = 0; row < height; ++row) {
+                uint16_t sprite_addr = c->cpu.I + row;
+                if (sprite_addr >= MEMORY_SIZE) break;
+                uint8_t sprite = c->memory.data[sprite_addr];
+                for (uint8_t col = 0; col < 8; ++col) {
+                    if ((sprite & (0x80 >> col)) != 0) {
+                        uint16_t px = (xPos + col) % DISPLAY_WIDTH;
+                        uint16_t py = (yPos + row) % DISPLAY_HEIGHT;
+                        uint16_t idx = py * DISPLAY_WIDTH + px;
+
+                        if (c->gfx[idx] == 1) c->cpu.V[0xF] = 1;
+                        c->gfx[idx] ^= 1;
+                    }
+                }
+            }
+
             c->draw_flag = 1;
             c->cpu.pc += 2;
             break;
         }
 
+        case 0xE000: { // key opcodes
+            switch (opcode & 0x00FF) {
+                case 0x9E: // SKP Vx
+                    c->cpu.pc += (c->keys[c->cpu.V[x]] ? 4 : 2);
+                    break;
+                case 0xA1: // SKNP Vx
+                    c->cpu.pc += (c->keys[c->cpu.V[x]] ? 2 : 4);
+                    break;
+                default:
+                    c->cpu.pc += 2;
+                    break;
+            }
+            break;
+        }
+
+        case 0xF000: {
+            switch (opcode & 0x00FF) {
+                case 0x07: // LD Vx, DT
+                    c->cpu.V[x] = c->cpu.delay_timer;
+                    c->cpu.pc += 2;
+                    break;
+                case 0x15: // LD DT, Vx
+                    c->cpu.delay_timer = c->cpu.V[x];
+                    c->cpu.pc += 2;
+                    break;
+                case 0x18: // LD ST, Vx
+                    c->cpu.sound_timer = c->cpu.V[x];
+                    c->cpu.pc += 2;
+                    break;
+                case 0x1E: // ADD I, Vx
+                    c->cpu.I += c->cpu.V[x];
+                    c->cpu.pc += 2;
+                    break;
+                case 0x0A: { // LD Vx, K (blocking wait)
+                    uint8_t found = 0;
+                    for (uint8_t i = 0; i < 16; ++i) {
+                        if (c->keys[i]) {
+                            c->cpu.V[x] = i;
+                            found = 1;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        // do not advance PC, wait for key
+                    } else {
+                        c->cpu.pc += 2;
+                    }
+                    break;
+                }
+                case 0x29: // LD F, Vx (set I to font sprite for digit Vx)
+                    c->cpu.I = 0x50 + (c->cpu.V[x] * 5);
+                    c->cpu.pc += 2;
+                    break;
+                case 0x33: { // LD B, Vx (store BCD)
+                    uint8_t val = c->cpu.V[x];
+                    c->memory.data[c->cpu.I + 0] = val / 100;
+                    c->memory.data[c->cpu.I + 1] = (val / 10) % 10;
+                    c->memory.data[c->cpu.I + 2] = val % 10;
+                    c->cpu.pc += 2;
+                    break;
+                }
+                case 0x55: { // LD [I], V0..Vx
+                    for (uint8_t i = 0; i <= x; ++i) {
+                        c->memory.data[c->cpu.I + i] = c->cpu.V[i];
+                    }
+                    c->cpu.pc += 2;
+                    break;
+                }
+                case 0x65: { // LD V0..Vx, [I]
+                    for (uint8_t i = 0; i <= x; ++i) {
+                        c->cpu.V[i] = c->memory.data[c->cpu.I + i];
+                    }
+                    c->cpu.pc += 2;
+                    break;
+                }
+                default:
+                    c->cpu.pc += 2;
+                    break;
+            }
+            break;
+        }
+
         default:
-            /* Unimplemented opcode: advance PC so we don't loop forever */
+            // unimplemented. advance to avoid infinite loop
             c->cpu.pc += 2;
             break;
     }
-
-    /* Timers should be updated at 60 Hz by the outer loop.
-       This function does not modify them here. */
 }

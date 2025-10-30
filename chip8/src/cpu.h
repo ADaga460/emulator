@@ -1,7 +1,3 @@
-#ifndef CPU_H
-#define CPU_H
-#include <stdint.h>
-#include "memory.h"
 /*
 Concepts:
     CHIP-8 CPU has:
@@ -13,14 +9,21 @@ Concepts:
     - 2 timers (delay and sound)
     This structure models the CPU state for emulation.
 */
+
+#ifndef CPU_H
+#define CPU_H
+
+#include <stdint.h>
+#include "memory.h"
+
 typedef struct {
-    uint8_t  V[16];      // general registers
-    uint16_t I;          // address register
-    uint16_t pc;         // program counter
-    uint16_t stack[16];  // call stack
-    uint8_t  sp;         // stack pointer
-    uint8_t  delay_timer;
-    uint8_t  sound_timer;
+    uint8_t V[16];        // general registers V0..VF
+    uint16_t I;           // index register
+    uint16_t pc;          // program counter
+    uint16_t stack[16];   // call stack
+    uint8_t sp;           // stack pointer
+    uint8_t delay_timer;  // delay timer (counts down at 60Hz)
+    uint8_t sound_timer;  // sound timer (counts down at 60Hz)
 } CPU;
 
 void cpu_init(CPU *c);

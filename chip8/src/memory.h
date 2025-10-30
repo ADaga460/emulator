@@ -1,8 +1,3 @@
-#ifndef MEMORY_H
-#define MEMORY_H
-
-#include <stdint.h>
-
 /*
 Concept
     CHIP-8 memory is 4 KB (4096 bytes).
@@ -12,8 +7,13 @@ Concept
     This shows how higher-level memory abstractions map to linear address spaces in hardware. Fun!
 */
 
+#ifndef MEMORY_H
+#define MEMORY_H
+
+#include <stdint.h>
 
 #define MEMORY_SIZE 4096
+#define ROM_START 0x200
 
 typedef struct {
     uint8_t data[MEMORY_SIZE];
