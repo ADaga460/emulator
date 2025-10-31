@@ -1,3 +1,5 @@
+// memory.h
+
 /*
 Concept
     CHIP-8 memory is 4 KB (4096 bytes).

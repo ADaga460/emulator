@@ -1,3 +1,5 @@
+// memory.c
+
 /*
 Concepts:
     Implementation of memory.h functions for CHIP-8 emulator.

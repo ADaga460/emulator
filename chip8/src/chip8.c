@@ -1,3 +1,5 @@
+// chip8.c
+
 /*
 Concepts:
     Implementation of chip8.h functions for CHIP-8 emulator.
@@ -69,6 +71,7 @@ void chip8_draw_display(const Chip8 *c) {
         }
         putchar('\n');
     }
+    fflush(stdout);  // ADD THIS LINE
 }
 
 /* Emulate one CPU cycle: fetch, decode, execute */
@@ -81,7 +84,7 @@ void chip8_emulate_cycle(Chip8 *c) {
     uint8_t n = opcode & 0x000F;
 
     // Debug
-    printf("Opcode: 0x%04X  PC: 0x%04X\n", opcode, c->cpu.pc);
+    //printf("Opcode: 0x%04X  PC: 0x%04X\n", opcode, c->cpu.pc);
 
     switch (opcode & 0xF000) {
         case 0x0000:
@@ -96,7 +99,7 @@ void chip8_emulate_cycle(Chip8 *c) {
                         c->cpu.pc += 2;
                     } else {
                         c->cpu.sp--;
-                        c->cpu.pc = c->cpu.stack[c->cpu.sp] + 2;
+                        c->cpu.pc = c->cpu.stack[c->cpu.sp];  // Just restore, no +2
                     }
                     break;
                 default:
@@ -112,7 +115,7 @@ void chip8_emulate_cycle(Chip8 *c) {
 
         case 0x2000: // CALL addr
             if (c->cpu.sp < 16) {
-                c->cpu.stack[c->cpu.sp++] = c->cpu.pc;
+                c->cpu.stack[c->cpu.sp++] = c->cpu.pc + 2;  // Save return address
                 c->cpu.pc = nnn;
             } else {
                 fprintf(stderr, "Stack overflow on CALL\n");
@@ -148,15 +151,35 @@ void chip8_emulate_cycle(Chip8 *c) {
         case 0x8000: {
             uint8_t sub = opcode & 0x000F;
             switch (sub) {
-                case 0x0: // LD Vx, Vy
-                    c->cpu.V[x] = c->cpu.V[y];
-                    break;
-                case 0x4: { // ADD Vx, Vy; VF = carry
-                    uint16_t sum = c->cpu.V[x] + c->cpu.V[y];
-                    c->cpu.V[0xF] = (sum > 0xFF) ? 1 : 0;
-                    c->cpu.V[x] = (uint8_t)sum;
-                    break;
-                }
+                case 0x1: // OR Vx, Vy
+                c->cpu.V[x] |= c->cpu.V[y];
+                break;
+            case 0x2: // AND Vx, Vy
+                c->cpu.V[x] &= c->cpu.V[y];
+                break;
+            case 0x3: // XOR Vx, Vy
+                c->cpu.V[x] ^= c->cpu.V[y];
+                break;
+            case 0x5: { // SUB Vx, Vy; VF = NOT borrow
+                c->cpu.V[0xF] = (c->cpu.V[x] >= c->cpu.V[y]) ? 1 : 0;
+                c->cpu.V[x] -= c->cpu.V[y];
+                break;
+            }
+            case 0x6: { // SHR Vx {, Vy}
+                c->cpu.V[0xF] = c->cpu.V[x] & 0x1;
+                c->cpu.V[x] >>= 1;
+                break;
+            }
+            case 0x7: { // SUBN Vx, Vy; VF = NOT borrow
+                c->cpu.V[0xF] = (c->cpu.V[y] >= c->cpu.V[x]) ? 1 : 0;
+                c->cpu.V[x] = c->cpu.V[y] - c->cpu.V[x];
+                break;
+            }
+            case 0xE: { // SHL Vx {, Vy}
+                c->cpu.V[0xF] = (c->cpu.V[x] & 0x80) >> 7;
+                c->cpu.V[x] <<= 1;
+                break;
+            }
                 default:
                     // not implemented other 8XYn
                     break;
@@ -164,10 +187,20 @@ void chip8_emulate_cycle(Chip8 *c) {
             c->cpu.pc += 2;
             break;
         }
-
+        case 0x9000: // SNE Vx, Vy (9XY0)
+            if ((opcode & 0x000F) == 0x0) {
+                c->cpu.pc += (c->cpu.V[x] != c->cpu.V[y]) ? 4 : 2;
+            } else {
+                c->cpu.pc += 2;
+            }
+            break;
         case 0xA000: // LD I, addr
             c->cpu.I = nnn;
             c->cpu.pc += 2;
+            break;
+
+        case 0xB000: // JP V0, addr
+            c->cpu.pc = nnn + c->cpu.V[0];
             break;
 
         case 0xC000: { // RND Vx, byte
