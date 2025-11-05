@@ -4,7 +4,8 @@
             "name": "macos-clang-arm64",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/opt/homebrew/include/SDL2/**"
+                "/opt/homebrew/include/SDL2/**",
+                "/opt/homebrew/Cellar/sdl2/2.32.10/include/SDL2"
             ],
             "compilerPath": "/usr/bin/clang",
             "cStandard": "${default}",

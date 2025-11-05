@@ -1,6 +1,7 @@
 //display_sdl.c
 
 #include "display_sdl.h"
+#include "SDL.h"
 #include <stdlib.h>
 
 Display* display_init(void) {

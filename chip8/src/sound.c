@@ -1,7 +1,7 @@
 // sound.c
 
 #include "sound.h"
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <math.h>
 
 static SDL_AudioDeviceID audio_device = 0;
