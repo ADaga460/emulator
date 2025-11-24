@@ -66,46 +66,61 @@ void display_cleanup(Display *d) {
 }
 
 int display_handle_input(Display *d, uint8_t *keys) {
-    (void)d; // unused
+    (void)d;
     SDL_Event e;
     
-    // Clear all keys first
-    for (int i = 0; i < 16; i++) {
-        keys[i] = 0;
-    }
+    // Don't clear all keys - only update them based on events!
     
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) {
-            return 0; // quit
+            return 0;
+        }
+        
+        if (e.type == SDL_KEYDOWN) {
+            switch(e.key.keysym.scancode) {
+                case SDL_SCANCODE_1: keys[0x1] = 1; break;
+                case SDL_SCANCODE_2: keys[0x2] = 1; break;
+                case SDL_SCANCODE_3: keys[0x3] = 1; break;
+                case SDL_SCANCODE_4: keys[0xC] = 1; break;
+                case SDL_SCANCODE_Q: keys[0x4] = 1; break;
+                case SDL_SCANCODE_W: keys[0x5] = 1; break;
+                case SDL_SCANCODE_E: keys[0x6] = 1; break;
+                case SDL_SCANCODE_R: keys[0xD] = 1; break;
+                case SDL_SCANCODE_A: keys[0x7] = 1; break;
+                case SDL_SCANCODE_S: keys[0x8] = 1; break;
+                case SDL_SCANCODE_D: keys[0x9] = 1; break;
+                case SDL_SCANCODE_F: keys[0xE] = 1; break;
+                case SDL_SCANCODE_Z: keys[0xA] = 1; break;
+                case SDL_SCANCODE_X: keys[0x0] = 1; break;
+                case SDL_SCANCODE_C: keys[0xB] = 1; break;
+                case SDL_SCANCODE_V: keys[0xF] = 1; break;
+                case SDL_SCANCODE_ESCAPE: return 0;
+                default: break;
+            }
+        }
+        
+        if (e.type == SDL_KEYUP) {
+            switch(e.key.keysym.scancode) {
+                case SDL_SCANCODE_1: keys[0x1] = 0; break;
+                case SDL_SCANCODE_2: keys[0x2] = 0; break;
+                case SDL_SCANCODE_3: keys[0x3] = 0; break;
+                case SDL_SCANCODE_4: keys[0xC] = 0; break;
+                case SDL_SCANCODE_Q: keys[0x4] = 0; break;
+                case SDL_SCANCODE_W: keys[0x5] = 0; break;
+                case SDL_SCANCODE_E: keys[0x6] = 0; break;
+                case SDL_SCANCODE_R: keys[0xD] = 0; break;
+                case SDL_SCANCODE_A: keys[0x7] = 0; break;
+                case SDL_SCANCODE_S: keys[0x8] = 0; break;
+                case SDL_SCANCODE_D: keys[0x9] = 0; break;
+                case SDL_SCANCODE_F: keys[0xE] = 0; break;
+                case SDL_SCANCODE_Z: keys[0xA] = 0; break;
+                case SDL_SCANCODE_X: keys[0x0] = 0; break;
+                case SDL_SCANCODE_C: keys[0xB] = 0; break;
+                case SDL_SCANCODE_V: keys[0xF] = 0; break;
+                default: break;
+            }
         }
     }
     
-    // Check current keyboard state
-    const uint8_t *state = SDL_GetKeyboardState(NULL);
-    
-    // Map keyboard to CHIP-8 keys
-    // CHIP-8:  1 2 3 C     Keyboard:  1 2 3 4
-    //          4 5 6 D                Q W E R
-    //          7 8 9 E                A S D F
-    //          A 0 B F                Z X C V
-    
-    if (state[SDL_SCANCODE_1]) keys[0x1] = 1;
-    if (state[SDL_SCANCODE_2]) keys[0x2] = 1;
-    if (state[SDL_SCANCODE_3]) keys[0x3] = 1;
-    if (state[SDL_SCANCODE_4]) keys[0xC] = 1;
-    if (state[SDL_SCANCODE_Q]) keys[0x4] = 1;
-    if (state[SDL_SCANCODE_W]) keys[0x5] = 1;
-    if (state[SDL_SCANCODE_E]) keys[0x6] = 1;
-    if (state[SDL_SCANCODE_R]) keys[0xD] = 1;
-    if (state[SDL_SCANCODE_A]) keys[0x7] = 1;
-    if (state[SDL_SCANCODE_S]) keys[0x8] = 1;
-    if (state[SDL_SCANCODE_D]) keys[0x9] = 1;
-    if (state[SDL_SCANCODE_F]) keys[0xE] = 1;
-    if (state[SDL_SCANCODE_Z]) keys[0xA] = 1;
-    if (state[SDL_SCANCODE_X]) keys[0x0] = 1;
-    if (state[SDL_SCANCODE_C]) keys[0xB] = 1;
-    if (state[SDL_SCANCODE_V]) keys[0xF] = 1;
-    if (state[SDL_SCANCODE_ESCAPE]) return 0; // quit
-    
-    return 1; // continue running
+    return 1;
 }
