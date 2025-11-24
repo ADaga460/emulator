@@ -336,7 +336,7 @@ void chip8_emulate_cycle(Chip8 *c) {
         }
 
         default:
-            // fallback: advance PC to avoid lock
+            fprintf(stderr, "Unimplemented opcode: 0x%04X at PC: 0x%04X\n", opcode, c->cpu.pc);
             c->cpu.pc += 2;
             break;
     }
