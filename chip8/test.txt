@@ -1,0 +1,5 @@
+aaravdaga@MacBookPro emulator % clisuite show file chip8/src/main.c
+Notes attached to file 'chip8/src/main.c':
+  - note_1764981253
+
+when i run this command, it should display the note rather than say what is attached to it. also, once a user pulls (whether that be from the terminal or from the github sidebar in vscode), it should send a message saying: "Here is the notes from the current commit" and displays it. also, what would be a good idea would be that when a user wants to see notes from a directory or folder, there can be an additional tag to allow recursive display to show all notes of all files in each directory.
